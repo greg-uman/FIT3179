@@ -22,7 +22,9 @@
     p.lead{color:var(--muted);margin:0 0 14px}
     .card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:16px;margin:16px 0;box-shadow:0 2px 12px rgba(0,0,0,.04)}
     .vis{width:100%}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+    .center-dropdown{display:flex;justify-content:center;gap:6px;margin-top:12px}
+    .center-dropdown select{font-size:.95rem;padding:4px 6px}
     .smallnote{color:var(--muted);font-size:.9rem;margin-top:8px}
     footer{margin:32px 0;color:var(--muted);font-size:.9rem}
   </style>
@@ -74,6 +76,11 @@
           <div id="stations-bars" class="vis"></div>
         </div>
       </div>
+      <!-- One shared FY dropdown centered under BOTH charts -->
+      <div class="center-dropdown">
+        <label for="fy-select"><strong>FY&nbsp;</strong></label>
+        <div id="fy-control"></div>
+      </div>
     </section>
 
     <!-- Section 5: SA2 Scatter -->
@@ -91,10 +98,17 @@
     </section>
 
   <script>
-    // ========= Shared parameter: Year dropdown for stations visuals & overlay =========
-    const stationYearParam = {
-      name: "StationYear",
-      value: 2024,
+    // ========= Shared parameter pieces (single control drives both charts) =========
+    const STATION_YEAR_NAME = "StationYear";
+    const STATION_YEAR_DEFAULT = 2024;
+
+    // Param for charts (no bind => no duplicate controls)
+    const stationYearParamCharts = { name: STATION_YEAR_NAME, value: STATION_YEAR_DEFAULT };
+
+    // Param for the single centered control
+    const stationYearParamControl = {
+      name: STATION_YEAR_NAME,
+      value: STATION_YEAR_DEFAULT,
       bind: {
         input: "select",
         options: [2020, 2023, 2024],
@@ -114,7 +128,7 @@
       width: "container",
       height: 560,
       autosize: { type: "fit", contains: "padding" },
-      params: [stationYearParam],
+      params: [stationYearParamCharts],
       projection: { type: "mercator" },
       data: { url: "data/melb_sa2_simplified.geojson", format: { type: "json", property: "features" } },
       transform: [
@@ -162,7 +176,7 @@
             longitude: { field: "Longitude", type: "quantitative" },
             latitude:  { field: "Latitude",  type: "quantitative" },
             size: { field: "Entries", type: "quantitative", title: "Entries", scale: { range: [40, 320] } },
-            color: { value: "#000000" },   // black triangles
+            color: { value: "#000000" },
             tooltip: [
               { field: "Station", title: "Station" },
               { field: "Entries", type: "quantitative", title: "Entries", format: "," },
@@ -181,7 +195,6 @@
       height: 420,
       title: "Public Transport Usage Since 2018",
       autosize: { type: "fit", contains: "padding" },
-
       data: {
         url: "data/monthly_public_transport_patronage_by_mode.csv",
         format: {
@@ -195,12 +208,10 @@
           }
         }
       },
-
       transform: [
         { fold: ["Metropolitan train","Metropolitan tram","Metropolitan bus"], as: ["Mode","Patronage"] },
         { calculate: "datetime(datum.Year, datum.Month-1, 1)", as: "MonthDate" }
       ],
-
       layer: [
         {
           selection: { mode_highlight: { type: "multi", fields: ["Mode"], bind: "legend" } },
@@ -217,14 +228,10 @@
             ]
           }
         },
-
-        /* COVID annotation rule */
         { data: { values: [{ date: "2022-01-01" }] },
           mark: { type: "rule", color: "red", strokeDash: [4,3], strokeWidth: 2 },
           encoding: { x: { field: "date", type: "temporal" } }
         },
-
-        /* White label area (no outline) + red text */
         {
           data: { values: [{ date: "2022-01-01", label: "Border reopening after COVID-19" }] },
           layer: [
@@ -253,9 +260,7 @@
       autosize: { type: "fit", contains: "padding" },
       title: "Public Transport Recovery vs Net Overseas Migration (Victoria)",
       resolve: { scale: { y: "independent" }, legend: { color: "shared" } },
-
       layer: [
-        // --- PT trips (monthly total) — LEFT AXIS ---
         {
           data: {
             url: "data/monthly_public_transport_patronage_by_mode.csv",
@@ -278,179 +283,138 @@
           ],
           mark: { type: "line", interpolate: "monotone", strokeWidth: 2 },
           encoding: {
-            x: {
-              field: "MonthDate", type: "temporal", title: "Year",
-              scale: { domainMin: "2018-01-01" },
-              axis: { format: "%Y", tickCount: "year", labelFlush: true }
-            },
-            y: {
-              field: "PT_Total", type: "quantitative",
-              title: "PT trips (monthly total)",
-              axis: { format: "~s", grid: true },
-              scale: { nice: true, zero: true }
-            },
-            color: {
-              field: "Series",
-              scale: { domain: ["PT trips","Net overseas migration"], range: ["#1e3a8a","#f59e0b"] },
-              legend: { title: "Series" }
-            },
+            x: { field: "MonthDate", type: "temporal", title: "Year",
+                 scale: { domainMin: "2018-01-01" },
+                 axis: { format: "%Y", tickCount: "year", labelFlush: true } },
+            y: { field: "PT_Total", type: "quantitative",
+                 title: "PT trips (monthly total)",
+                 axis: { format: "~s", grid: true },
+                 scale: { nice: true, zero: true } },
+            color: { field: "Series",
+                     scale: { domain: ["PT trips","Net overseas migration"], range: ["#1e3a8a","#f59e0b"] },
+                     legend: { title: "Series" } },
             tooltip: [
               { field: "MonthDate", type: "temporal", title: "Month" },
               { field: "PT_Total", type: "quantitative", title: "PT trips", format: "," }
             ]
           }
         },
-
-        // --- NOM (quarterly) — RIGHT AXIS ---
         {
-          data: {
-            url: "data/vic_migration_quarterly.csv",
-            format: { type: "csv", parse: { QuarterDate: "date", NOM: "number" } }
-          },
+          data: { url: "data/vic_migration_quarterly.csv",
+                  format: { type: "csv", parse: { QuarterDate: "date", NOM: "number" } } },
           transform: [
             { calculate: "'Net overseas migration'", as: "Series" },
             { filter: "toDate(datum.QuarterDate) >= toDate('2018-01-01')" }
           ],
           mark: { type: "line", interpolate: "step-after", strokeWidth: 2 },
           encoding: {
-            x: {
-              field: "QuarterDate", type: "temporal",
-              scale: { domainMin: "2018-01-01" },
-              axis: { format: "%Y", tickCount: "year", labelFlush: true }
-            },
-            y: {
-              field: "NOM", type: "quantitative",
-              title: "Net overseas migration (quarterly, Victoria)",
-              axis: { orient: "right", format: "~s", grid: false }
-            },
-            color: {
-              field: "Series",
-              scale: { domain: ["PT trips","Net overseas migration"], range: ["#1e3a8a","#f59e0b"] }
-            },
+            x: { field: "QuarterDate", type: "temporal",
+                 scale: { domainMin: "2018-01-01" },
+                 axis: { format: "%Y", tickCount: "year", labelFlush: true } },
+            y: { field: "NOM", type: "quantitative",
+                 title: "Net overseas migration (quarterly, Victoria)",
+                 axis: { orient: "right", format: "~s", grid: false } },
+            color: { field: "Series",
+                     scale: { domain: ["PT trips","Net overseas migration"], range: ["#1e3a8a","#f59e0b"] } },
             tooltip: [
               { field: "QuarterDate", type: "temporal", title: "Quarter" },
               { field: "NOM", type: "quantitative", title: "NOM", format: "," }
             ]
           }
         },
-
-        // --- Annotation: border reopening ---
-        {
-          data: { values: [{ date: "2022-01-01" }] },
+        { data: { values: [{ date: "2022-01-01" }] },
           mark: { type: "rule", color: "#ef4444", strokeDash: [4,3], strokeWidth: 2 },
-          encoding: { x: { field: "date", type: "temporal" } }
-        },
+          encoding: { x: { field: "date", type: "temporal" } } },
         {
           data: { values: [{ date: "2022-01-01", label: "Border reopening\n(early 2022)" }] },
           layer: [
-            {
-              mark: { type: "rect", fill: "white", opacity: 0.95 },
-              encoding: {
-                x: { field: "date", type: "temporal" }, xOffset: { value: 6 },
-                x2: { field: "date", type: "temporal" }, x2Offset: { value: 170 },
-                y: { datum: 0, axis: null }, y2: { datum: 1, axis: null }
-              }
-            },
-            {
-              mark: { type: "text", align: "left", dx: 10, dy: -14, color: "#ef4444", fontSize: 12, fontWeight: "bold" },
-              encoding: {
-                x: { field: "date", type: "temporal" },
-                y: { datum: 0, axis: null },
-                text: { field: "label" }
-              }
-            }
+            { mark: { type: "rect", fill: "white", opacity: 0.95 },
+              encoding: { x: { field: "date", type: "temporal" }, xOffset: { value: 6 },
+                          x2: { field: "date", type: "temporal" }, x2Offset: { value: 170 },
+                          y: { datum: 0, axis: null }, y2: { datum: 1, axis: null } } },
+            { mark: { type: "text", align: "left", dx: 10, dy: -14, color: "#ef4444", fontSize: 12, fontWeight: "bold" },
+              encoding: { x: { field: "date", type: "temporal" }, y: { datum: 0, axis: null }, text: { field: "label" } } }
           ]
         }
       ],
-
       config: { view: { stroke: null } }
     };
 
-    // ===================== Mode share PIE (filtered by StationYear FY) =====================
-// ===================== Mode share DONUT (labels aligned via theta stack:true) =====================
-const modePieSpec = {
-  $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-  width: "container",
-  height: 420,
-  autosize: { type: "fit", contains: "padding" },
-  params: [stationYearParam],
-
-  data: {
-    url: "data/monthly_public_transport_patronage_by_mode.csv",
-    format: {
-      type: "csv",
-      parse: {
-        Year: "number",
-        Month: "number",
-        "Metropolitan train": "number",
-        "Metropolitan tram": "number",
-        "Metropolitan bus": "number"
-      }
-    }
-  },
-
-  // Prepare totals & shares once
-  transform: [
-    { calculate: "datum.Month >= 7 ? datum.Year : datum.Year - 1", as: "FiscalStart" },
-    { filter: "datum.FiscalStart == StationYear" },
-    { fold: ["Metropolitan train","Metropolitan tram","Metropolitan bus"], as: ["Mode","Patronage"] },
-    { aggregate: [{ op: "sum", field: "Patronage", as: "TotalTrips" }], groupby: ["Mode"] },
-    { window: [{ op: "sum", field: "TotalTrips", as: "AllTrips" }] },
-    { calculate: "datum.TotalTrips / datum.AllTrips", as: "share" },
-    { calculate: "replace(datum.Mode,'Metropolitan ','')", as: "ModeShort" }
-  ],
-
-  // 🔑 Top-level encoding applies to both layers so positions match
-  encoding: {
-    theta: { field: "TotalTrips", type: "quantitative", stack: true },   // align layers by the same polar stack
-    color: {
-      field: "Mode",
-      type: "nominal",
-      scale: MODE_COLOUR,
-      legend: { title: "Mode", labelExpr: "replace(datum.label, 'Metropolitan ', '')" }
-    },
-    order: { field: "TotalTrips", type: "quantitative", sort: "descending" } // consistent ordering
-  },
-
-  layer: [
-    // --- donut arcs ---
-    {
-      mark: { type: "arc", innerRadius: 100, outerRadius: 190 },
-      encoding: {
-        tooltip: [
-          { field: "ModeShort", title: "Mode" },
-          { field: "TotalTrips", type: "quantitative", title: "Trips", format: "," },
-          { field: "share", type: "quantitative", title: "Share", format: ".0%" }
-        ]
-      }
-    },
-
-    {
-      mark: {
-        type: "text",
-        fontWeight: "bold",
-        fontSize: 14,
-        fill: "white",
-        align: "center",
-        baseline: "middle",
-        radius: 145 
+    // ===================== Mode DONUT (legend bigger; title; tooltip kept) =====================
+    const modePieSpec = {
+      $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+      title: "Mode Share (Selected FY)",
+      width: "container",
+      height: 450,
+      autosize: { type: "fit", contains: "padding" },
+      params: [stationYearParamCharts],
+      data: {
+        url: "data/monthly_public_transport_patronage_by_mode.csv",
+        format: {
+          type: "csv",
+          parse: {
+            Year: "number",
+            Month: "number",
+            "Metropolitan train": "number",
+            "Metropolitan tram": "number",
+            "Metropolitan bus": "number"
+          }
+        }
       },
+      transform: [
+        { calculate: "datum.Month >= 7 ? datum.Year : datum.Year - 1", as: "FiscalStart" },
+        { filter: "datum.FiscalStart == StationYear" },
+        { fold: ["Metropolitan train","Metropolitan tram","Metropolitan bus"], as: ["Mode","Patronage"] },
+        { aggregate: [{ op: "sum", field: "Patronage", as: "TotalTrips" }], groupby: ["Mode"] },
+        { window: [{ op: "sum", field: "TotalTrips", as: "AllTrips" }] },
+        { calculate: "datum.TotalTrips / datum.AllTrips", as: "share" },
+        { calculate: "replace(datum.Mode,'Metropolitan ','')", as: "ModeShort" }
+      ],
       encoding: {
-        text: { field: "share", type: "quantitative", format: ".0%" },
-    
-      }
-    }
-  ],
+        theta: { field: "TotalTrips", type: "quantitative", stack: true },
+        color: {
+          field: "Mode",
+          type: "nominal",
+          scale: MODE_COLOUR,
+          legend: {
+            title: "Mode",
+            orient: "bottom",
+            direction: "horizontal",
+            labelExpr: "replace(datum.label, 'Metropolitan ', '')",
+            titleFontSize: 14,
+            labelFontSize: 14,
+            symbolSize: 220
+          }
+        },
+        order: { field: "TotalTrips", sort: "descending" }
+      },
+      layer: [
+        {
+          mark: { type: "arc", innerRadius: 100, outerRadius: 190 },
+          encoding: {
+            tooltip: [
+              { field: "ModeShort", title: "Mode" },
+              { field: "TotalTrips", type: "quantitative", title: "Trips", format: "," },
+              { field: "share", type: "quantitative", title: "Share", format: ".0%" }
+            ]
+          }
+        },
+        {
+          mark: { type: "text", radius: 145, fontWeight: "bold", fontSize: 14, fill: "white", align: "center", baseline: "middle" },
+          encoding: { text: { field: "share", type: "quantitative", format: ".0%" } }
+        }
+      ],
+      config: { view: { stroke: null } }
+    };
 
-  config: { view: { stroke: null } }
-};
-    // ===================== STATIONS: Top-20 bar with Year dropdown =====================
+    // ===================== STATIONS: Top-20 bar with title (uses shared FY) =====================
     const stationsBarSpec = {
       $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+      title: "Busiest Stations (Top 20, Selected FY)",
       width: "container",
       height: 520,
       autosize: { type: "fit", contains: "padding" },
-      params: [stationYearParam],
+      params: [stationYearParamCharts],
       data: { url: "data/station_usage.csv", format: { type: "csv", parse: { Entries: "number", Year: "number" } } },
       transform: [
         { filter: "datum.Year == StationYear" },
@@ -461,13 +425,22 @@ const modePieSpec = {
       encoding: {
         y: { field: "Station", type: "nominal", sort: "-x", title: "Station" },
         x: { field: "Entries", type: "quantitative", title: "Annual entries", axis: { format: "~s" } },
-        color: { value: "#1e3a8a" },  // navy bars
+        color: { value: "#1e3a8a" },
         tooltip: [
           { field: "Station" },
           { field: "Entries", type: "quantitative", format: "," },
           { field: "Year", type: "quantitative" }
         ]
       }
+    };
+
+    // ============ Minimal spec to host the single bound FY dropdown (centered below both charts) ============
+    const fyControlSpec = {
+      $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+      width: 1, height: 1,
+      params: [stationYearParamControl],
+      data: { values: [{}] },
+      mark: { type: "point", opacity: 0 } // invisible; just renders the control
     };
 
     // ===================== 5) SA2 SCATTER: points + regression =====================
@@ -525,9 +498,22 @@ const modePieSpec = {
     vegaEmbed('#stacked-area',    stackedAreaSpec,   { renderer: 'svg', actions: false });
     vegaEmbed('#pt-vs-migration', ptVsMigrationSpec, { renderer: 'svg', actions: false });
 
-    // UPDATED: pie instead of bars, and placed beside stations bars
-    vegaEmbed('#mode-pie',        modePieSpec,       { renderer: 'svg', actions: false });
-    vegaEmbed('#stations-bars',   stationsBarSpec,   { renderer: 'svg', actions: false });
+    // Combined section renders
+    const pieP  = vegaEmbed('#mode-pie',      modePieSpec,     { renderer: 'svg', actions: false });
+    const barP  = vegaEmbed('#stations-bars', stationsBarSpec, { renderer: 'svg', actions: false });
+    const fyP   = vegaEmbed('#fy-control',    fyControlSpec,   { renderer: 'svg', actions: false });
+
+    // Wire the single control to both charts (and initialize them to its current value)
+    Promise.all([pieP, barP, fyP]).then(([pie, bars, fy]) => {
+      const initVal = fy.view.signal(STATION_YEAR_NAME);
+      pie.view.signal(STATION_YEAR_NAME, initVal).run();
+      bars.view.signal(STATION_YEAR_NAME, initVal).run();
+
+      fy.view.addSignalListener(STATION_YEAR_NAME, (_name, val) => {
+        pie.view.signal(STATION_YEAR_NAME, val).run();
+        bars.view.signal(STATION_YEAR_NAME, val).run();
+      });
+    });
 
     vegaEmbed('#sa2-scatter',     sa2ScatterSpec,    { renderer: 'svg', actions: false });
   </script>
