@@ -30,7 +30,7 @@
   <div class="wrap">
     <header>
       <h1>Melbourne Public Transport – How Has it Evolved in Recent Years?</h1>
-      <div class="subtitle">How Melbournians rely on PT (<strong>ABS 2021</strong>), how the transport mode mix has changed over time (<strong>PTV DataVic</strong>), and which stations anchor the network across Victoria.</div>
+      <div class="subtitle">How Melburnians rely on PT (<strong>ABS 2021</strong>), how the transport mode mix has changed over time (<strong>PTV DataVic</strong>), and which stations anchor the network across Victoria.</div>
     </header>
 
     <!-- Section 1: Map (choropleth + station overlay) -->
@@ -44,7 +44,7 @@
     <!-- Section 2: Mode mix over time -->
     <section class="card">
       <h2>How Public Transport Usage Evolved Before and After COVID-19</h2>
-      <p class="lead">Usage fell sharply during 2020 when COVID hit, then steadily recovered after border reopenings in early 2022. Trains remain the backbone, with trams and buses providing steady inner-suburban and feeder capacity. Recovery is ongoing and still shy of pre-pandemic peaks, possible due to the explosion of working from home.</p>
+      <p class="lead">Usage fell sharply during 2020 when COVID hit, then steadily recovered after border reopenings in early 2022. Trains remain the backbone, with trams and buses providing steady inner-suburban and feeder capacity. Recovery is ongoing and still shy of pre-pandemic peaks, possibly influenced by the rise of working from home.</p>
       <div id="stacked-area" class="vis"></div>
       <div class="smallnote">Source: Department of Transport &amp; Planning (Vic) — Monthly public transport patronage by mode.</div>
     </section>
@@ -63,19 +63,30 @@
       <div id="stations-bars" class="vis"></div>
     </section>
 
-    <!-- Project Metadata -->
-    <footer>
-      <p><strong>Author:</strong> Greg Umansky &nbsp; | &nbsp; <strong>Date:</strong> 12 Oct 2025</p>
-      <ul>
-      </ul>
-    </footer>
+    <!-- Section 5: Scatter Plot -->
+    <section class="card">
+      <h2>Does Density Drive Public Transport Use?</h2>
+      <p class="lead">
+        Suburbs (SA2) with more employed commuters per square kilometre tend to have a higher share using public transport.
+        Bubble size shows the number of PT commuters. The red line is a linear regression fit. Outliers at the far right
+        (e.g., Melbourne–CBD North) have very high densities but a lower PT share than expected in 2021; at the other end,
+        coastal inner suburbs like Elwood also sit below the trend—likely reflecting gaps or indirect access to heavy rail
+        compared with tram-rich or station-adjacent areas.
+      </p>
+      <div id="sa2-scatter" class="vis"></div>
+      <div class="smallnote">Sources: ABS 2021 Census (SA2 boundaries &amp; travel to work).</div>
+    </section>
 
   <script>
     // ========= Shared parameter: Year dropdown for stations visuals & overlay =========
     const stationYearParam = {
       name: "StationYear",
       value: 2024,
-      bind: { input: "select", options: [2020, 2023, 2024], labels: ["FY20–21","FY23–24","FY24–25"] }
+      bind: {
+        input: "select",
+        options: [2020, 2023, 2024],
+        labels: ["2020–21 (COVID year)", "2023–24 (recovery)", "2024–25 (latest)"]
+      }
     };
 
     // ===================== 1) MAP: choropleth + station overlay =====================
@@ -112,7 +123,7 @@
               scale: {
                 type: "sqrt",
                 domain: [0, 45],
-                range: ["#dbeafe", "#60a5fa", "#2563eb", "#1e3a8a"], /* stronger contrast >10% */
+                range: ["#dbeafe", "#60a5fa", "#2563eb", "#1e3a8a"],
                 clamp: true
               }
             },
@@ -132,12 +143,12 @@
             { window: [{ op: "rank", as: "rk" }], sort: [{ field: "Entries", order: "descending" }] },
             { filter: "datum.rk <= 20" }
           ],
-          mark: { type: "point", shape: "triangle-up", filled: true, opacity: 0.75, stroke: "#0f172a", strokeWidth: 0.8 },
+          mark: { type: "point", shape: "triangle-up", filled: true, opacity: 0.85, stroke: "#111", strokeWidth: 0.9 },
           encoding: {
             longitude: { field: "Longitude", type: "quantitative" },
             latitude:  { field: "Latitude",  type: "quantitative" },
             size: { field: "Entries", type: "quantitative", title: "Entries", scale: { range: [40, 320] } },
-            color: { value: "#1d4ed8" },
+            color: { value: "#000000" },   // black triangles
             tooltip: [
               { field: "Station", title: "Station" },
               { field: "Entries", type: "quantitative", title: "Entries", format: "," },
@@ -147,6 +158,13 @@
         }
       ],
       config: { view: { stroke: null } }
+    };
+
+    // Shared colour scale for modes — applied to BOTH the area chart and the bar chart.
+    // Train = blue, Tram = green, Bus = grey
+    const MODE_COLOUR = {
+      domain: ["Metropolitan train","Metropolitan tram","Metropolitan bus"],
+      range: ["#0B5FFF", "#00B368", "#9CA3AF"]
     };
 
     // ===================== 2) MODE MIX: with COVID annotation =====================
@@ -178,20 +196,12 @@
 
       layer: [
         {
-          selection: {
-            mode_highlight: { type: "multi", fields: ["Mode"], bind: "legend" }
-          },
+          selection: { mode_highlight: { type: "multi", fields: ["Mode"], bind: "legend" } },
           mark: { type: "area", interpolate: "monotone" },
           encoding: {
             x: { field: "MonthDate", type: "temporal", title: "Month" },
             y: { field: "Patronage", type: "quantitative", stack: "zero", title: "Trips", axis: { format: "~s" } },
-            color: {
-              field: "Mode", type: "nominal", title: "Mode",
-              scale: {
-                domain: ["Metropolitan train","Metropolitan tram","Metropolitan bus"],
-                range: ["#1d4ed8","#ea580c","#16a34a"]
-              }
-            },
+            color: { field: "Mode", type: "nominal", title: "Mode", scale: MODE_COLOUR },
             opacity: { condition: { selection: "mode_highlight", value: 1 }, value: 0.25 },
             tooltip: [
               { field: "MonthDate", type: "temporal", title: "Month" },
@@ -202,37 +212,56 @@
         },
 
         /* COVID annotation rule */
-        { data: { values: [{ date: "2022-01-01" }] },
+        {
+          data: { values: [{ date: "2022-01-01" }] },
           mark: { type: "rule", color: "red", strokeDash: [4,3], strokeWidth: 2 },
           encoding: { x: { field: "date", type: "temporal" } }
         },
 
-        /* Label with white halo for readability */
-        { data: { values: [{ date: "2022-01-01", label: "Border reopening after COVID-19" }] },
+        /* White label area (no outline) + red text */
+        {
+          data: { values: [{ date: "2022-01-01", label: "Border reopening after COVID-19" }] },
           layer: [
-            { mark: { type: "text", align: "left", dx: 5, dy: -10, color: "white", fontSize: 13, stroke: "white", strokeWidth: 6, strokeJoin: "round" },
-              encoding: { x: { field: "date", type: "temporal" }, y: { datum: 0 }, text: { field: "label" } } },
-            { mark: { type: "text", align: "left", dx: 5, dy: -10, color: "red", fontSize: 12, fontWeight: "bold" },
-              encoding: { x: { field: "date", type: "temporal" }, y: { datum: 0 }, text: { field: "label" } } }
+            {
+              mark: { type: "rect", fill: "white", opacity: 0.9 },
+              encoding: {
+                x: { field: "date", type: "temporal" }, xOffset: { value: 6 },
+                x2: { field: "date", type: "temporal" }, x2Offset: { value: 220 },
+                y: { datum: 0 }, y2: { datum: 10000000 }
+              }
+            },
+            {
+              mark: { type: "text", align: "left", dx: 10, dy: -10, color: "red", fontSize: 12, fontWeight: "bold" },
+              encoding: { x: { field: "date", type: "temporal" }, y: { datum: 0 }, text: { field: "label" } }
+            }
           ]
         }
       ]
     };
 
-    // ===================== 3) MODE TOTALS =====================
+    // ===================== 3) MODE TOTALS (filtered by StationYear FY) =====================
     const barSpec = {
       $schema: "https://vega.github.io/schema/vega-lite/v5.json",
       width: "container",
       height: 320,
       autosize: { type: "fit", contains: "padding" },
-      data: { url: "data/monthly_public_transport_patronage_by_mode.csv",
-              format: { type: "csv",
-                parse: {
-                  "Metropolitan train": "number",
-                  "Metropolitan tram": "number",
-                  "Metropolitan bus": "number"
-                } } },
+      params: [stationYearParam],
+      data: {
+        url: "data/monthly_public_transport_patronage_by_mode.csv",
+        format: {
+          type: "csv",
+          parse: {
+            Year: "number",
+            Month: "number",
+            "Metropolitan train": "number",
+            "Metropolitan tram": "number",
+            "Metropolitan bus": "number"
+          }
+        }
+      },
       transform: [
+        { calculate: "datum.Month >= 7 ? datum.Year : datum.Year - 1", as: "FiscalStart" },
+        { filter: "datum.FiscalStart == StationYear" },
         { fold: ["Metropolitan train","Metropolitan tram","Metropolitan bus"], as: ["Mode","Patronage"] },
         { aggregate: [{ op: "sum", field: "Patronage", as: "TotalTrips" }], groupby: ["Mode"] },
         { calculate: "replace(datum.Mode,'Metropolitan ','')", as: "ModeShort" }
@@ -240,9 +269,15 @@
       mark: { type: "bar", cornerRadiusTopLeft: 6, cornerRadiusTopRight: 6 },
       encoding: {
         x: { field: "ModeShort", type: "nominal", title: "Mode" },
-        y: { field: "TotalTrips", type: "quantitative", title: "Total Trips (all months)", axis: { format: "~s" } },
-        color: { value: "#60a5fa" },
-        tooltip: [{ field: "ModeShort", title: "Mode" }, { field: "TotalTrips", type: "quantitative", format: "," }]
+        y: {
+          field: "TotalTrips", type: "quantitative",
+          title: "Total trips (selected financial year)", axis: { format: "~s" }
+        },
+        color: { field: "Mode", type: "nominal", scale: MODE_COLOUR, title: "Mode" },
+        tooltip: [
+          { field: "ModeShort", title: "Mode" },
+          { field: "TotalTrips", type: "quantitative", format: "," }
+        ]
       }
     };
 
@@ -263,9 +298,67 @@
       encoding: {
         y: { field: "Station", type: "nominal", sort: "-x", title: "Station" },
         x: { field: "Entries", type: "quantitative", title: "Annual entries", axis: { format: "~s" } },
-        color: { value: "#60a5fa" },
-        tooltip: [{ field: "Station" }, { field: "Entries", type: "quantitative", format: "," }, { field: "Year", type: "quantitative" }]
+        color: { value: "#1e3a8a" },  // navy bars for stations
+        tooltip: [
+          { field: "Station" },
+          { field: "Entries", type: "quantitative", format: "," },
+          { field: "Year", type: "quantitative" }
+        ]
       }
+    };
+
+    // ===================== 5) SA2 SCATTER: navy bubbles + red regression =====================
+    const sa2ScatterSpec = {
+      $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+      width: "container",
+      height: 460,
+      autosize: { type: "fit", contains: "padding" },
+      data: {
+        url: "data/sa2_pt_density.csv",
+        format: {
+          type: "csv",
+          parse: {
+            Density_commuters: "number",
+            PT_percent: "number",
+            PT_Total: "number",
+            Area_sqkm: "number"
+          }
+        }
+      },
+      transform: [
+        { calculate: "datum.PT_percent", as: "PT_pct" }
+      ],
+      layer: [
+        {
+          mark: { type: "point", filled: true, opacity: 0.7 },
+          encoding: {
+            x: { field: "Density_commuters", type: "quantitative", title: "Commuter density (per km²)", axis: { grid: true } },
+            y: { field: "PT_pct", type: "quantitative", title: "PT mode share (%)", axis: { grid: true } },
+            size: { field: "PT_Total", type: "quantitative", title: "PT commuters", scale: { range: [20, 900] } },
+            color: { value: "#1e3a8a" },
+            tooltip: [
+              { field: "SA2_NAME_2021", title: "Suburb (SA2)" },
+              { field: "Density_commuters", type: "quantitative", title: "Commuter density", format: ",.0f" },
+              { field: "PT_pct", type: "quantitative", title: "PT share", format: ".1f" },
+              { field: "PT_Total", type: "quantitative", title: "PT commuters", format: "," },
+              { field: "Area_sqkm", type: "quantitative", title: "Area (km²)", format: ",.2f" }
+            ]
+          }
+        },
+        {
+          transform: [
+            { regression: "PT_pct", on: "Density_commuters", as: ["Density_commuters", "PT_pct_fit"] }
+          ],
+          mark: { type: "line", strokeWidth: 2 },
+          encoding: {
+            x: { field: "Density_commuters", type: "quantitative" },
+            y: { field: "PT_pct_fit", type: "quantitative" },
+            color: { value: "#ef4444" },
+            order: { field: "Density_commuters" }
+          }
+        }
+      ],
+      config: { view: { stroke: null } }
     };
 
     // ===================== Render (SVG = crisp) =====================
@@ -273,6 +366,7 @@
     vegaEmbed('#stacked-area',  stackedAreaSpec, { renderer: 'svg', actions: false });
     vegaEmbed('#bars',          barSpec,         { renderer: 'svg', actions: false });
     vegaEmbed('#stations-bars', stationsBarSpec, { renderer: 'svg', actions: false });
+    vegaEmbed('#sa2-scatter',   sa2ScatterSpec,  { renderer: 'svg', actions: false });
   </script>
 </body>
 </html>
