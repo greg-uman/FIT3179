@@ -12,13 +12,29 @@
 
   <style>
     :root{
-      --maxw: 1200px; --ink:#111827; --muted:#6b7280; --card:#ffffff; --bg:#fafafa; --rule:#e5e7eb;
-    }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
-    .wrap{max-width:var(--maxw);margin:28px auto;padding:0 16px;}
-    h1{font-size:2rem;margin:0 0 8px;}
-    .subtitle{color:var(--muted);margin-bottom:24px;max-width:80ch}
-    h2{font-size:1.35rem;margin:24px 0 6px}
+  --maxw: 1200px;
+  --ink:#0A1A4F;     /* Dark navy for headings */
+  --ink2:#21325E;    /* Slightly lighter navy for body text */
+  --muted:#6b7280;
+  --card:#ffffff;
+  --bg:#f4f5fb;
+  --rule:#e5e7eb;
+}
+h1, h2 {
+  color: var(--ink);          /* dark navy headings */
+}
+
+.subtitle, p, .smallnote, .lead, body {
+  color: var(--ink2);         /* slightly lighter navy text */
+}
+
+html,body {
+  margin:0;
+  padding:0;
+  background:var(--bg);
+  font:16px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}    .wrap{max-width:var(--maxw);margin:28px auto;padding:0 16px;}
+
     p.lead{color:var(--muted);margin:0 0 14px}
     .card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:16px;margin:16px 0;box-shadow:0 2px 12px rgba(0,0,0,.04)}
     .vis{width:100%}
@@ -40,7 +56,7 @@
     <!-- Section 1: Map (choropleth + station overlay) -->
     <section class="card">
       <h2>Where Melburnians Rely Most on Public Transport</h2>
-      <p class="lead">Inner-city and corridor suburbs show the highest dependence on PT, reflecting dense rail and tram access. Triangle markers highlight the 20 busiest stations in the selected year—clustered around the CBD and key junctions like Richmond, Caulfield and Footscray.</p>
+      <p class="lead">Inner-city and corridor suburbs show the highest dependence on PT, reflecting dense rail and tram access. Triangle markers highlight the 20 busiest stations in the selected year -clustered around the CBD and key junctions like Richmond, Caulfield and Footscray.</p>
       <div id="map" class="vis"></div>
       <div class="smallnote">Sources: ABS 2021 Census (G62), ASGS 2021 SA2; PTV Annual Metropolitan Station Entries (FY20–21, FY23–24, FY24–25).</div>
     </section>
@@ -87,8 +103,10 @@
     <section class="card">
       <h2>Does Density Drive Public Transport Use?</h2>
       <p class="lead">
-        Suburbs (SA2) with more employed commuters per square kilometre tend to have a higher share using public transport.
-        Bubble size shows the number of PT commuters. The red line is a linear regression fit.
+        <p class="lead">
+  Suburbs (SA2) with more employed commuters per square kilometre tend to have a higher share using public transport.
+  Bubble size shows the number of PT commuters. The red line is a linear regression fit. 
+  Notably, <strong>Elwood</strong> and <strong>Port Melbourne</strong> sit <em>below</em> the line of best fit, both have comparatively poorer heavy-rail access and rely more on indirect tram/bus connections, while <strong>Docklands</strong> sits <em>above</em> the line, buoyed by immediate access to major hubs like <strong>Southern Cross</strong> and the CBD tram spine.
       </p>
       <div id="sa2-scatter" class="vis"></div>
       <div class="smallnote">Sources: ABS 2021 Census (SA2 boundaries &amp; travel to work).</div>
@@ -239,15 +257,7 @@
         },
         {
           data: { values: [{ date: "2022-01-01", label: "Border reopening after COVID-19" }] },
-          layer: [
-            {
-              mark: { type: "rect", fill: "white", opacity: 0.9 },
-              encoding: {
-                x: { field: "date", type: "temporal" }, xOffset: { value: 6 },
-                x2: { field: "date", type: "temporal" }, x2Offset: { value: 220 },
-                y: { datum: 0 }, y2: { datum: 10000000 }
-              }
-            },
+          layer: [ 
             {
               mark: { type: "text", align: "left", dx: 10, dy: -10, color: "red", fontSize: 12, fontWeight: "bold" },
               encoding: { x: { field: "date", type: "temporal" }, y: { datum: 0 }, text: { field: "label" } }
@@ -292,7 +302,7 @@
           encoding: {
             x: { field: "MonthDate", type: "temporal", title: "Year", scale: { domainMin: "2018-01-01" }, axis: { format: "%Y", tickCount: "year", labelFlush: true } },
             y: { field: "PT_Total", type: "quantitative", title: "PT trips (monthly total)", axis: { format: "~s", grid: true }, scale: { nice: true, zero: true } },
-            color: { field: "Series", scale: { domain: ["PT trips","Net Immigration"], range: ["#1e3a8a","#f59e0b"] }, legend: { title: "Series" } }
+            color: { field: "Series", scale: { domain: ["PT trips","Net Immigration"], range: ["#065f46","#f59e0b"] }, legend: { title: "Series" } }
           }
         },
         {
@@ -342,8 +352,8 @@
         { fold: ["Metropolitan train","Metropolitan tram","Metropolitan bus"], as: ["Mode","Patronage"] },
         { aggregate: [{ op: "sum", field: "Patronage", as: "TotalTrips" }], groupby: ["Mode"] },
         { window: [{ op: "sum", field: "TotalTrips", as: "AllTrips" }] },
+        { joinaggregate: [{ op: "sum", field: "TotalTrips", as: "AllTrips" }] },
         { calculate: "datum.TotalTrips / datum.AllTrips", as: "share" },
-        { calculate: "replace(datum.Mode,'Metropolitan ','')", as: "ModeShort" }
       ],
       encoding: {
         theta: { field: "TotalTrips", type: "quantitative", stack: true },
@@ -398,31 +408,61 @@
       mark: { type: "point", opacity: 0 } // just hosts the <select>
     };
 
-    /* ============================================================
-       7) SA2 Scatter (density vs PT share)
-       ============================================================ */
-    const sa2ScatterSpec = {
-      $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-      width: "container",
-      height: 460,
-      autosize: { type: "fit", contains: "padding" },
-      data: { url: "data/sa2_pt_density.csv", format: { type: "csv", parse: { Density_commuters: "number", PT_percent: "number", PT_Total: "number", Area_sqkm: "number" } } },
-      transform: [{ calculate: "datum.PT_percent", as: "PT_pct" }],
-      layer: [
-        { mark: { type: "point", filled: true, opacity: 0.7 },
-          encoding: {
-            x: { field: "Density_commuters", type: "quantitative", title: "Commuter density (per km²)", axis: { grid: true } },
-            y: { field: "PT_pct", type: "quantitative", title: "PT mode share (%)", axis: { grid: true } },
-            size: { field: "PT_Total", type: "quantitative", title: "PT commuters", scale: { range: [20, 900] } },
-            color: { value: "#1e3a8a" }
-          }
-        },
-        { transform: [{ regression: "PT_pct", on: "Density_commuters", as: ["Density_commuters", "PT_pct_fit"] }],
-          mark: { type: "line", strokeWidth: 2 },
-          encoding: { x: { field: "Density_commuters", type: "quantitative" }, y: { field: "PT_pct_fit", type: "quantitative" }, color: { value: "#ef4444" } } }
+
+  /* ============================================================
+   7) SA2 Scatter (density vs PT share) — tooltips restored
+   ============================================================*/
+const sa2ScatterSpec = {
+  $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+  width: "container",
+  height: 460,
+  autosize: { type: "fit", contains: "padding" },
+  data: {
+    url: "data/sa2_pt_density.csv",
+    format: {
+      type: "csv",
+      parse: {
+        Density_commuters: "number",
+        PT_percent: "number",
+        PT_Total: "number",
+        Area_sqkm: "number"
+      }
+    }
+  },
+  transform: [{ calculate: "datum.PT_percent", as: "PT_pct" }],
+  layer: [
+    // Keep the regression line, but draw it first so points sit above it.
+    {
+      transform: [
+        { regression: "PT_pct", on: "Density_commuters", as: ["Density_commuters", "PT_pct_fit"] }
       ],
-      config: { view: { stroke: null } }
-    };
+      mark: { type: "line", strokeWidth: 2, color: "#ef4444" },
+      encoding: {
+        x: { field: "Density_commuters", type: "quantitative" },
+        y: { field: "PT_pct_fit", type: "quantitative" }
+      }
+    },
+
+    // Points with full tooltip details 
+    {
+      mark: { type: "point", filled: true, opacity: 0.7 },
+      encoding: {
+        x: { field: "Density_commuters", type: "quantitative", title: "Commuter density (per km²)", axis: { grid: true } },
+        y: { field: "PT_pct", type: "quantitative", title: "PT mode share (%)", axis: { grid: true } },
+        size: { field: "PT_Total", type: "quantitative", title: "PT commuters", scale: { range: [20, 900] } },
+        color: { value: "#4c1d95" },
+        tooltip: [
+          { field: "SA2_NAME_2021", title: "Suburb (SA2)" },
+          { field: "Density_commuters", type: "quantitative", title: "Commuter density", format: ",.0f" },
+          { field: "PT_pct", type: "quantitative", title: "PT share (%)", format: ".1f" },
+          { field: "PT_Total", type: "quantitative", title: "PT commuters", format: "," },
+          { field: "Area_sqkm", type: "quantitative", title: "Area (km²)", format: ",.2f" }
+        ]
+      }
+    }
+  ],
+  config: { view: { stroke: null } }
+};
 
     /* ============================================================
        8) Render (SVG = crisp) and wire the FY control
